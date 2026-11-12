@@ -3,10 +3,19 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" content="#f5f6f1">
+    <meta name="theme-color" content="#f4f6fa">
     <title>Form — Your transformation, in motion</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <script>
+      try {
+        if (localStorage.getItem("form-transform-theme-v1") === "dark") {
+          document.documentElement.dataset.theme = "dark";
+        }
+      } catch (error) {
+        console.error("Could not load theme preference.", error);
+      }
+    </script>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
   </head>
@@ -44,7 +53,8 @@
           <div class="breadcrumb"><span>Workspace</span><span class="breadcrumb-slash">/</span><strong>Overview</strong></div>
           <div class="topbar-actions">
             <span class="today-label" id="header-date"></span>
-            <button class="icon-button" id="open-log-top" aria-label="Log today's progress" title="Log progress">
+            <button class="icon-button theme-toggle" id="theme-toggle" type="button" aria-label="Switch to dark theme" title="Switch to dark theme"><span aria-hidden="true">☾</span></button>
+            <button class="icon-button" id="open-log-top" aria-label="Log progress for selected day" title="Log progress">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
             </button>
           </div>
@@ -98,7 +108,12 @@
               <h2>Your day<span class="heading-period">.</span></h2>
             </div>
             <div class="day-controls">
-              <span class="date-pill"><span aria-hidden="true">◷</span><span id="today-date"></span></span>
+              <div class="date-navigation" aria-label="Choose day">
+                <button class="date-nav-button" id="previous-day" type="button" aria-label="Go to previous day" title="Previous day">‹</button>
+                <span class="date-pill"><span aria-hidden="true">◷</span><time id="today-date"></time></span>
+                <button class="date-nav-button" id="next-day" type="button" aria-label="Go to next day" title="Next day">›</button>
+                <button class="date-today-button" id="go-to-today" type="button" hidden>Today</button>
+              </div>
               <button class="button button-primary" id="open-log"><span aria-hidden="true">＋</span> Log progress</button>
             </div>
           </div>
@@ -106,7 +121,7 @@
           <div class="plan-grid">
             <article class="plan-card">
               <div class="plan-header">
-                <div class="plan-title-wrap"><span class="plan-icon exercise-icon" aria-hidden="true">↗</span><div><h3>Movement</h3><span class="plan-subtitle">A little stronger each day</span></div></div>
+                <div class="plan-title-wrap"><span class="plan-icon exercise-icon" aria-hidden="true">↗</span><div><h3>Training</h3><span class="plan-subtitle" id="workout-session">Your weekly routine</span></div></div>
                 <button class="text-button" data-add="exercise"><span>＋</span> Add exercise</button>
               </div>
               <div class="plan-list" id="exercise-list"></div>
@@ -115,11 +130,11 @@
 
             <article class="plan-card">
               <div class="plan-header">
-                <div class="plan-title-wrap"><span class="plan-icon meal-icon" aria-hidden="true">✳</span><div><h3>Nourishment</h3><span class="plan-subtitle">Fuel for the things you love</span></div></div>
+                <div class="plan-title-wrap"><span class="plan-icon meal-icon" aria-hidden="true">✳</span><div><h3>Daily nutrition</h3><span class="plan-subtitle" id="nutrition-day-meta">Your weekly meal plan</span></div></div>
                 <button class="text-button" data-add="meal"><span>＋</span> Add meal</button>
               </div>
               <div class="plan-list" id="meal-list"></div>
-              <div class="plan-footer"><span id="meal-summary">0 completed</span><span class="footer-dash"></span><span>FUEL YOUR DAY</span></div>
+              <div class="plan-footer nutrition-footer"><span id="meal-summary">0 completed</span><span class="footer-dash"></span><strong id="nutrition-totals"></strong><span id="nutrition-water"></span></div>
             </article>
           </div>
         </section>
@@ -168,7 +183,7 @@
       <form id="entry-form">
         <label class="field-label" for="entry-name" id="entry-name-label">Name</label>
         <input id="entry-name" name="name" type="text" maxlength="60" placeholder="e.g. Morning walk" required>
-        <div class="form-actions"><button type="button" class="button button-quiet" id="cancel-entry">Cancel</button><button type="submit" class="button button-primary">Add to today <span>↗</span></button></div>
+        <div class="form-actions"><button type="button" class="button button-quiet" id="cancel-entry">Cancel</button>        <button type="submit" class="button button-primary">Add to day <span>↗</span></button></div>
       </form>
     </dialog>
 
@@ -191,6 +206,7 @@
     </dialog>
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <script src="diet-plan.js"></script>
     <script src="app.js"></script>
   </body>
 </html>

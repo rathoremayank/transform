@@ -2,15 +2,65 @@
   "use strict";
 
   const STORAGE_KEY = "form-transform-tracker-v1";
+  const THEME_STORAGE_KEY = "form-transform-theme-v1";
   const today = new Date();
+  let selectedDate = new Date(today);
   const dateKey = (date) => {
     const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
     return localDate.toISOString().slice(0, 10);
   };
   const todayKey = dateKey(today);
+  let selectedDateKey = todayKey;
   const formatDate = (date, options) => new Intl.DateTimeFormat(undefined, options).format(date);
   const dateFromKey = (key) => new Date(`${key}T12:00:00`);
   const createId = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+  const weeklyNutritionPlan = window.weeklyNutritionPlan;
+  const weeklyRoutine = {
+    0: {
+      session: "Shoulders / Arms / Core",
+      exercises: [
+        ["Lateral Raises (heavy + drop set)", "4 x 12-20"],
+        ["Rear Delt Fly", "3 x 15"],
+        ["Barbell/EZ Curl", "3 x 8-10"],
+        ["Overhead Triceps Extension", "3 x 10-12"],
+        ["Hanging Knee Raise", "3 x 12"],
+        ["Plank", "3 x 45 s"]
+      ]
+    },
+    1: {
+      session: "Push",
+      exercises: [
+        ["Flat Barbell/DB Bench Press", "4 x 6-8"],
+        ["Incline (30°) Cable/DB Fly", "3 x 10-12"],
+        ["Seated DB Shoulder Press", "3 x 8-10"],
+        ["Lateral Raises", "4 x 12-15"],
+        ["Triceps Pushdown", "3 x 10-12"]
+      ]
+    },
+    2: {
+      session: "Pull",
+      exercises: [
+        ["Lat Pulldown / Pull-ups", "4 x 6-10"],
+        ["Barbell/Chest-Supported Row", "4 x 8-10"],
+        ["Seated Cable Row", "3 x 10-12"],
+        ["Face Pulls", "3 x 15"],
+        ["Incline DB Curl", "3 x 10-12"]
+      ]
+    },
+    3: { session: "Rest", exercises: [["Daily steps", "8-10k steps"]] },
+    4: { session: "Rest", exercises: [["Daily steps", "8-10k steps"]] },
+    5: { session: "Rest", exercises: [["Daily steps", "8-10k steps"]] },
+    6: {
+      session: "Legs",
+      exercises: [
+        ["Back Squat / Leg Press", "4 x 6-8"],
+        ["Romanian Deadlift", "3 x 8-10"],
+        ["Walking Lunges", "3 x 10/leg"],
+        ["Leg Curl", "3 x 12"],
+        ["Standing Calf Raise", "3 x 12-15"]
+      ]
+    }
+  };
 
   function loadData() {
     try {
@@ -27,15 +77,8 @@
     return {
       days: {
         [todayKey]: {
-          exercises: [
-            { id: createId(), name: "Strength session", detail: "30 min · Full body", done: false },
-            { id: createId(), name: "Get outside", detail: "20 min · Easy pace", done: false }
-          ],
-          meals: [
-            { id: createId(), name: "Breakfast", detail: "A balanced start", done: false },
-            { id: createId(), name: "Lunch", detail: "A nourishing plate", done: false },
-            { id: createId(), name: "Dinner", detail: "Eat well, feel good", done: false }
-          ],
+          exercises: [],
+          meals: [],
           log: {}
         }
       }
@@ -49,12 +92,52 @@
   const logDialog = byId("log-dialog");
   const entryDialog = byId("entry-dialog");
 
-  function getDay(key = todayKey) {
+  function getDay(key = selectedDateKey) {
     if (!state.days[key]) state.days[key] = { exercises: [], meals: [], log: {} };
-    if (!Array.isArray(state.days[key].exercises)) state.days[key].exercises = [];
-    if (!Array.isArray(state.days[key].meals)) state.days[key].meals = [];
-    if (!state.days[key].log || typeof state.days[key].log !== "object") state.days[key].log = {};
-    return state.days[key];
+    const day = state.days[key];
+    if (!Array.isArray(day.exercises)) day.exercises = [];
+    if (!Array.isArray(day.meals)) day.meals = [];
+    if (!day.log || typeof day.log !== "object") day.log = {};
+
+    if (!day.routineSeeded) {
+      const routine = weeklyRoutine[dateFromKey(key).getDay()];
+      routine.exercises.forEach(([name, detail], index) => {
+        day.exercises.push({
+          id: `${key}-routine-${index}`,
+          name,
+          detail,
+          done: false,
+          routine: true
+        });
+      });
+      day.routineSeeded = true;
+      saveData();
+    }
+
+    if (!day.mealsPlanSeeded) {
+      const starterMeals = new Set([
+        "Breakfast|A balanced start",
+        "Lunch|A nourishing plate",
+        "Dinner|Eat well, feel good"
+      ]);
+      day.meals = day.meals.filter((meal) => !starterMeals.has(`${meal.name}|${meal.detail}`));
+      const nutrition = weeklyNutritionPlan[dateFromKey(key).getDay()];
+      nutrition.meals.forEach(([name, detail, kcal, protein], index) => {
+        day.meals.push({
+          id: `${key}-nutrition-${index}`,
+          name,
+          detail,
+          kcal,
+          protein,
+          done: false,
+          nutritionPlan: true
+        });
+      });
+      day.mealsPlanSeeded = true;
+      saveData();
+    }
+
+    return day;
   }
 
   function saveData() {
@@ -78,9 +161,46 @@
   }
 
   function renderDate() {
-    byId("header-date").textContent = formatDate(today, { weekday: "short", month: "short", day: "numeric" });
-    byId("today-date").textContent = formatDate(today, { month: "short", day: "numeric", year: "numeric" });
+    const isToday = selectedDateKey === todayKey;
+    byId("header-date").textContent = formatDate(selectedDate, { weekday: "short", month: "short", day: "numeric" });
+    byId("today-date").textContent = formatDate(selectedDate, { month: "short", day: "numeric", year: "numeric" });
+    byId("today-date").dateTime = selectedDateKey;
+    byId("today-date").parentElement.setAttribute("aria-label", `Selected day: ${formatDate(selectedDate, { weekday: "long", month: "long", day: "numeric", year: "numeric" })}`);
+    byId("go-to-today").hidden = isToday;
+    const routine = weeklyRoutine[selectedDate.getDay()];
+    byId("workout-session").textContent = `${formatDate(selectedDate, { weekday: "long" })} · ${routine.session} · Repeats weekly`;
+    const nutrition = weeklyNutritionPlan[selectedDate.getDay()];
+    byId("nutrition-day-meta").textContent = `${nutrition.dayType} · ${nutrition.training}`;
+    byId("nutrition-totals").textContent = `${nutrition.totalKcal.toLocaleString()} kcal · ${nutrition.totalProtein}g protein`;
+    byId("nutrition-water").textContent = nutrition.water;
   }
+
+  function changeSelectedDate(offset) {
+    selectedDate = new Date(selectedDate);
+    selectedDate.setDate(selectedDate.getDate() + offset);
+    selectedDateKey = dateKey(selectedDate);
+    render();
+  }
+
+  function setTheme(theme, persist = true) {
+    const isDark = theme === "dark";
+    document.documentElement.dataset.theme = isDark ? "dark" : "light";
+    const button = byId("theme-toggle");
+    button.setAttribute("aria-label", `Switch to ${isDark ? "light" : "dark"} theme`);
+    button.title = `Switch to ${isDark ? "light" : "dark"} theme`;
+    button.innerHTML = `<span aria-hidden="true">${isDark ? "☀" : "☾"}</span>`;
+    document.querySelector('meta[name="theme-color"]').content = isDark ? "#111b2a" : "#f4f6fa";
+    if (persist) {
+      try {
+        localStorage.setItem(THEME_STORAGE_KEY, isDark ? "dark" : "light");
+      } catch (error) {
+        console.error("Could not save theme preference.", error);
+        showToast("Theme changed, but your preference could not be saved.");
+      }
+    }
+  }
+
+  setTheme(document.documentElement.dataset.theme === "dark" ? "dark" : "light", false);
 
   function renderList(type) {
     const day = getDay();
@@ -117,6 +237,18 @@
         detail.textContent = item.detail || (type === "exercise" ? "Movement" : "Nourishment");
         copy.append(name, detail);
 
+        row.append(checkbox, copy);
+        if (type === "meal" && Number.isFinite(item.kcal) && Number.isFinite(item.protein)) {
+          const macros = document.createElement("div");
+          macros.className = "meal-macros";
+          const calories = document.createElement("span");
+          calories.textContent = `${item.kcal} kcal`;
+          const protein = document.createElement("span");
+          protein.textContent = `${item.protein}g protein`;
+          macros.append(calories, protein);
+          row.append(macros);
+        }
+
         const remove = document.createElement("button");
         remove.className = "task-delete";
         remove.type = "button";
@@ -127,9 +259,9 @@
           if (index >= 0) items.splice(index, 1);
           saveData();
           render();
-          showToast(`${label} removed from today's plan.`);
+          showToast(`${label} removed from the selected day's plan.`);
         });
-        row.append(checkbox, copy, remove);
+        row.append(remove);
         list.append(row);
       });
     }
@@ -190,7 +322,7 @@
     const dots = points.map((point) => `<circle class="chart-point" cx="${point.x.toFixed(1)}" cy="${point.y.toFixed(1)}" r="3.5"><title>${formatDate(point.date, { month: "short", day: "numeric" })}: ${point.value} kg</title></circle>`).join("");
     const first = formatDate(entries[0].date, { month: "short", day: "numeric" });
     const last = formatDate(entries[entries.length - 1].date, { month: "short", day: "numeric" });
-    chart.innerHTML = `<svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="chart-fill" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stop-color="#b6ce9b" stop-opacity=".35"/><stop offset="100%" stop-color="#b6ce9b" stop-opacity=".02"/></linearGradient></defs>${grid}<path class="chart-area" d="${area}"/><path class="chart-line" d="${line}"/>${dots}<text class="chart-axis-label" x="${left}" y="112">${first}</text><text class="chart-axis-label" x="${right}" y="112" text-anchor="end">${last}</text></svg>`;
+    chart.innerHTML = `<svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="chart-fill" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stop-color="#9bb9dd" stop-opacity=".35"/><stop offset="100%" stop-color="#9bb9dd" stop-opacity=".02"/></linearGradient></defs>${grid}<path class="chart-area" d="${area}"/><path class="chart-line" d="${line}"/>${dots}<text class="chart-axis-label" x="${left}" y="112">${first}</text><text class="chart-axis-label" x="${right}" y="112" text-anchor="end">${last}</text></svg>`;
     const latest = values[values.length - 1];
     byId("chart-latest").textContent = latest.value.toFixed(1);
     byId("chart-range").textContent = `${values.length} ${values.length === 1 ? "check-in" : "check-ins"} this month`;
@@ -284,6 +416,16 @@
 
   byId("open-log").addEventListener("click", openLogDialog);
   byId("open-log-top").addEventListener("click", openLogDialog);
+  byId("previous-day").addEventListener("click", () => changeSelectedDate(-1));
+  byId("next-day").addEventListener("click", () => changeSelectedDate(1));
+  byId("go-to-today").addEventListener("click", () => {
+    selectedDate = new Date(today);
+    selectedDateKey = todayKey;
+    render();
+  });
+  byId("theme-toggle").addEventListener("click", () => {
+    setTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark");
+  });
   byId("cancel-log").addEventListener("click", () => logDialog.close());
   byId("cancel-entry").addEventListener("click", () => entryDialog.close());
 
@@ -330,7 +472,7 @@
     if (saveData()) {
       entryDialog.close();
       render();
-      showToast(`${activeList === "exercise" ? "Exercise" : "Meal"} added to today's plan.`);
+      showToast(`${activeList === "exercise" ? "Exercise" : "Meal"} added to the selected day's plan.`);
     }
   });
 
